@@ -1,0 +1,17 @@
+# See https://github.com/github/gitignore/blob/main/Node.gitignore
+node_modules/
+.vite/
+dist/
+.DS_Store
+.env*
+*.log
+*.local
+.cache/
+coverage/
+.vercel
+.next
+.bun/
+bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

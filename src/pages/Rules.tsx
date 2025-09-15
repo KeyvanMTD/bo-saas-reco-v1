@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Hero from '@/components/Hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 export default function RulesPage() {
   const [mode, setMode] = useState('all');
@@ -100,6 +102,19 @@ export default function RulesPage() {
     // aucun item -> charger un demo par défaut
     void loadInsights('demo');
   }, [activeTab, items, insightsRuleId, insightsLoading, insights]);
+
+  // Stats pour KPIs (onglet Manage)
+  const stats = useMemo(() => {
+    const total = items.length;
+    const by = (mode: string) => items.filter(r => r.mode === mode).length;
+    return {
+      total,
+      active: by('active'),
+      draft: by('draft'),
+      paused: by('paused'),
+      archived: by('archived'),
+    };
+  }, [items]);
 
   // AI Suggestions (v2) — préremplissage du formulaire
   const [aiSimProductId, setAiSimProductId] = useState('');
@@ -264,6 +279,14 @@ export default function RulesPage() {
         </TabsList>
 
         <TabsContent value="manage" className="space-y-6 mt-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Card><CardContent className="pt-6"><div className="text-xs text-muted-foreground">Total</div><div className="text-2xl font-semibold">{stats.total}</div></CardContent></Card>
+            <Card><CardContent className="pt-6"><div className="text-xs text-muted-foreground">Actives</div><div className="text-2xl font-semibold">{stats.active}</div></CardContent></Card>
+            <Card><CardContent className="pt-6"><div className="text-xs text-muted-foreground">Draft</div><div className="text-2xl font-semibold">{stats.draft}</div></CardContent></Card>
+            <Card><CardContent className="pt-6"><div className="text-xs text-muted-foreground">Paused</div><div className="text-2xl font-semibold">{stats.paused}</div></CardContent></Card>
+            <Card><CardContent className="pt-6"><div className="text-xs text-muted-foreground">Archived</div><div className="text-2xl font-semibold">{stats.archived}</div></CardContent></Card>
+          </div>
           <Card className="sticky top-16 z-10 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               <div>
@@ -300,25 +323,54 @@ export default function RulesPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="space-y-2">{[...Array(4)].map((_,i)=>(<div key={i} className="h-16 rounded-xl bg-muted/40 animate-pulse" />))}</div>
+                <div className="space-y-2">{[...Array(6)].map((_,i)=>(<div key={i} className="h-10 rounded-lg bg-muted/40 animate-pulse" />))}</div>
               ) : items.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-12 text-center">Aucune règle</div>
               ) : (
-                <div className="space-y-2">
-                  {items.map((r)=> (
-                    <div key={r._id} className="p-4 rounded-xl border border-border bg-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-foreground">{r.name} <span className="text-xs text-muted-foreground ml-2">prio {r.priority}</span></div>
-                        <div className="text-xs text-muted-foreground">{r.mode} • {r.kind_scope?.join(', ') || 'all kinds'}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={()=>onOpenPreview(r)}>Preview</Button>
-                        <Button variant="outline" size="sm" onClick={()=>openEdit(r)}>Edit</Button>
-                        <Button variant="outline" size="sm" onClick={()=>onPauseResume(r)}>{r.mode==='paused'?'Resume':'Pause'}</Button>
-                        <Button variant="outline" size="sm" onClick={()=>onDelete(r)}>Delete</Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-muted-foreground">
+                        <th className="text-left py-2">Nom</th>
+                        <th className="text-left py-2">Mode</th>
+                        <th className="text-left py-2">Scope</th>
+                        <th className="text-left py-2">Priorité</th>
+                        <th className="text-left py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((r)=> (
+                        <tr key={r._id} className="border-t border-border">
+                          <td className="py-2">
+                            <div className="font-medium text-foreground">{r.name}</div>
+                            <div className="text-xs text-muted-foreground">MAJ: {r.updated_at ? new Date(r.updated_at).toLocaleString('fr-FR') : '—'}</div>
+                          </td>
+                          <td className="py-2">
+                            <Badge variant={r.mode==='active'?'default':(r.mode==='paused'?'secondary':'outline')}>{r.mode}</Badge>
+                          </td>
+                          <td className="py-2">
+                            <div className="flex flex-wrap gap-1">
+                              {(r.kind_scope||['similar','complementary','x-sell']).map(k=> (<Badge key={k} variant="outline">{k}</Badge>))}
+                            </div>
+                          </td>
+                          <td className="py-2 w-48">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-8">{r.priority}</span>
+                              <Progress value={Math.max(0, Math.min(100, r.priority||0))} />
+                            </div>
+                          </td>
+                          <td className="py-2">
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={()=>onOpenPreview(r)}>Preview</Button>
+                              <Button variant="outline" size="sm" onClick={()=>openEdit(r)}>Edit</Button>
+                              <Button variant="outline" size="sm" onClick={()=>onPauseResume(r)}>{r.mode==='paused'?'Resume':'Pause'}</Button>
+                              <Button variant="outline" size="sm" onClick={()=>onDelete(r)}>Delete</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
